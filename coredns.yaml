@@ -1,0 +1,73 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: coredns
+  annotations:
+    kubernetes.io/description: 'psp to attach to coredns'
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
+  labels:
+    kubernetes.io/cluster-service: "true"
+    eks.amazonaws.com/component: pod-security-policy
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  allowedCapabilities:
+  - 'NET_BIND_SERVICE'
+  volumes:
+  - configMap
+  - secret
+  - emptyDir
+  hostNetwork: true
+  hostPorts:
+  - min: 0
+    max: 65535
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eks:podsecuritypolicy:coredns
+  namespace: kube-system
+  labels:
+      kubernetes.io/cluster-service: "true"
+      eks.amazonaws.com/component: pod-security-policy
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - coredns
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eks:podsecuritypolicy:coredns
+  namespace: kube-system
+  annotations:
+    kubernetes.io/description: 'Allow service account coredns to use coredns psp in kube-system namespace.'
+  labels:
+    kubernetes.io/cluster-service: "true"
+    eks.amazonaws.com/component: pod-security-policy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eks:podsecuritypolicy:coredns
+subjects:
+  - kind: ServiceAccount
+    name: coredns
+    namespace: kube-system

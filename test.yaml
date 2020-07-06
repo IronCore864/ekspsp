@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+spec:
+  containers:
+    - name: test
+      # run as user 0
+      image: docker.io/ironcore864/go-hello-http:root
+      # run as user 1000
+      # image: docker.io/ironcore864/go-hello-http:latest

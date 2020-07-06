@@ -1,0 +1,86 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+    name: restricted
+    annotations:
+      seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default,runtime/default'
+      seccomp.security.alpha.kubernetes.io/defaultProfileName:  'runtime/default'
+spec:
+    privileged: false
+    # Required to prevent escalations to root.
+    allowPrivilegeEscalation: false
+    # This is redundant with non-root + disallow privilege escalation,
+    # but we can provide it for defense in depth.
+    requiredDropCapabilities:
+    - ALL
+    # Allow core volume types.
+    volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    # Assume that persistentVolumes set up by the cluster admin are safe to use.
+    - 'persistentVolumeClaim'
+    - 'awsElasticBlockStore'
+    hostNetwork: false
+    hostIPC: false
+    hostPID: false
+    hostPorts:
+      - min: 1025
+        max: 65535
+    runAsUser:
+      # Require the container to run without root privileges.
+      rule: 'MustRunAsNonRoot'
+    seLinux:
+      # This policy assumes the nodes are using AppArmor rather than SELinux.
+      rule: 'RunAsAny'
+    supplementalGroups:
+      rule: 'MustRunAs'
+      ranges:
+        # Forbid adding the root group.
+        - min: 1
+          max: 65535
+    fsGroup:
+      rule: 'MustRunAs'
+      ranges:
+        # Forbid adding the root group.
+        - min: 1
+          max: 65535
+    readOnlyRootFilesystem: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eks:podsecuritypolicy:restricted
+  labels:
+    kubernetes.io/cluster-service: "true"
+    eks.amazonaws.com/component: pod-security-policy
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - restricted
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eks:podsecuritypolicy:authenticated
+  annotations:
+    kubernetes.io/description: 'Allow all authenticated users to create restricted pods.'
+  labels:
+    kubernetes.io/cluster-service: "true"
+    eks.amazonaws.com/component: pod-security-policy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: eks:podsecuritypolicy:restricted
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
